@@ -28,6 +28,8 @@ PORT := $(PORT)
 OLDPORT ?= 5000
 CONTINUE ?= false
 IFLOW_VERSION ?= latest
+ENV_CSH ?= /tools/toolsh/others_UCAgent.csh
+ENV_SHELL ?= tcsh
 ##########################################################################
 
 clean:
@@ -135,9 +137,9 @@ run:
 	tmux kill-session -t hk_batch_cagent_session_$(PORT) || true
 	tmux new-session -d -s hk_batch_cagent_session_$(PORT)
 	tmux send-keys -t hk_batch_cagent_session_$(PORT):0.0 \
-	   "make run_seq_mcp PORT=$(PORT) OLDPORT=$(OLDPORT) WORKSPACE=$(WORKSPACE) RESULT=$(RESULT) \
-	   TIMES=$(TIMES) VTARGET=$(VTARGET)" C-m
+	   "$(ENV_SHELL) -c 'source $(ENV_CSH); make run_seq_mcp PORT=$(PORT) OLDPORT=$(OLDPORT) WORKSPACE=$(WORKSPACE) RESULT=$(RESULT) \
+	   TIMES=$(TIMES) VTARGET=\"$(VTARGET)\"'" C-m
 	tmux split-window -h -t hk_batch_cagent_session_$(PORT):0.0
 	tmux send-keys -t hk_batch_cagent_session_$(PORT):0.1 \
-	   "make run_seq_cagent PORT=$(PORT) OLDPORT=$(OLDPORT) WORKSPACE=$(WORKSPACE) RESULT=$(RESULT)" C-m
+	   "$(ENV_SHELL) -c 'source $(ENV_CSH); make run_seq_cagent PORT=$(PORT) OLDPORT=$(OLDPORT) WORKSPACE=$(WORKSPACE) RESULT=$(RESULT)'" C-m
 	tmux attach-session -t hk_batch_cagent_session_$(PORT)
