@@ -112,6 +112,7 @@ run_seq_cagent:
 	done
 
 config_claude_mcp:
+	@echo "Configure Claude MCP server unitytest at http://127.0.0.1:$(PORT)/mcp"
 	cd $(WORKSPACE)/$(PORT) && claude mcp add --transport http unitytest http://127.0.0.1:$(PORT)/mcp --scope project
 
 run_one_cagent:
@@ -126,6 +127,7 @@ run_one_cagent:
 	#  You can modify the corresponding startup code according to different Code Agent
 	$(MAKE) config_claude_mcp PORT=$(PORT) WORKSPACE=$(WORKSPACE)
 	(sleep 10; tmux send-keys `ucagent --hook-message cagent_init`; sleep 1; tmux send-keys Enter)&
+	# Skip interactive permission prompts so Claude can run inside tmux automation; Claude MCP is already configured above with the same PORT.
 	cd $(WORKSPACE)/$(PORT) && claude --dangerously-skip-permissions && (echo true > dut_complete.txt)
 	@echo "`date`: DUT claude code execution completed." >> $(RESULT)/$(PORT)/run_log.txt
 
