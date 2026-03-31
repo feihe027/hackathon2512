@@ -111,6 +111,9 @@ run_seq_cagent:
 	  $(MAKE) run_one_cagent PORT=$(PORT); \
 	done
 
+config_claude_mcp:
+	cd $(WORKSPACE)/$(PORT) && claude mcp add --transport http unitytest http://127.0.0.1:$(PORT)/mcp --scope project
+
 run_one_cagent:
 	@while [ ! -e "$(WORKSPACE)/$(PORT)/Guide_Doc/dut_fixture.md" ] || \
 	       [ -e "$(WORKSPACE)/$(PORT)/dut_complete.txt" ]; do \
@@ -121,7 +124,7 @@ run_one_cagent:
 	done
 	# Run Claude Code
 	#  You can modify the corresponding startup code according to different Code Agent
-	cd $(WORKSPACE)/$(PORT) && claude mcp add --transport http unitytest http://127.0.0.1:$(PORT)/mcp --scope project
+	$(MAKE) config_claude_mcp PORT=$(PORT) WORKSPACE=$(WORKSPACE)
 	(sleep 10; tmux send-keys `ucagent --hook-message cagent_init`; sleep 1; tmux send-keys Enter)&
 	cd $(WORKSPACE)/$(PORT) && claude --dangerously-skip-permissions && (echo true > dut_complete.txt)
 	@echo "`date`: DUT claude code execution completed." >> $(RESULT)/$(PORT)/run_log.txt

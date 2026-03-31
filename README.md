@@ -72,6 +72,20 @@ Claude Code的MCP配置（端口号与UCAgent MCP端口号保持一致）：
 claude mcp add --transport http unitytest http://127.0.0.1:portX/mcp --scope project
 ```
 
+如果您是手动启动 MCP，例如：
+
+```bash
+make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000 CONTINUE=1
+```
+
+则启动完成后，需要手动执行：
+
+```bash
+claude mcp add --transport http unitytest http://127.0.0.1:5000/mcp --scope project
+```
+
+如果 `PORT` 没有手动指定、而是由 Makefile 随机分配，则这里的 `claude mcp add` 也必须使用同一个随机端口。
+
 Claude Code的Hooks配置（~/.claude/settings.json）建议如下：
 
 ```json
@@ -120,6 +134,9 @@ make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000
 # 继续上次UCAgent， 不加 CONTINUE=1 会清空工作目录重新运行
 make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000 CONTINUE=1
 
+# 手动启动 MCP 后，需要用同一个端口配置 Claude Code
+claude mcp add --transport http unitytest http://127.0.0.1:5000/mcp --scope project
+
 # 清空临时数据
 make clean
 
@@ -129,6 +146,8 @@ make clean_all
 
 结果位于`result/<port>/`目录下, port为每次启动时随机选择的MCP端口。
 PORT 可以通过参数指定 eg: `make run PORT=5005`。
+执行 `make run` 时，会自动执行 `claude mcp add --transport http unitytest http://127.0.0.1:<PORT>/mcp --scope project`，
+其中 `<PORT>` 与 UCAgent MCP 端口保持一致；如果是随机端口，则 Claude Code 也会自动使用同一个随机端口。
 
 请根据您的需要修改`Makefile`，例如支持 Claude Code 等。
 
