@@ -57,40 +57,53 @@ UT模块Scala文件地址（源于：[YunSuan模块](https://github.com/OpenXian
 
 OS环境：建议 ubuntu 24.04 LST （window下建议使用WSL2）
 
-本仓库UCAgent的使用模式为： MCP + [iFlow-CLI](https://platform.iflow.cn/cli/quickstart)
+本仓库UCAgent的使用模式为： MCP + [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)
 
 请先通过pip安装好[UCAgent](https://github.com/XS-MLVP/UCAgent)及其依赖
 
 其他依赖：
-- Nodejs v20+: 建议通过 nvm [https://github.com/nvm-sh/nvm](https://github.com/nvm-sh/nvm)安装Nodejs
-- npx: 安装命令`npm install -g npx`， 用于免安装执行最新版本 iFlow
+- Claude Code: 安装命令`npm install -g @anthropic-ai/claude-code`，详见 [https://docs.anthropic.com/en/docs/claude-code/overview](https://docs.anthropic.com/en/docs/claude-code/overview)
 - Tmux: [https://tmuxcheatsheet.com/how-to-install-tmux/](https://tmuxcheatsheet.com/how-to-install-tmux/)
 
-iFlow的MCP和Hooks配置（~/.iflow/settings.json）建议如下：
+Claude Code的MCP配置（端口号与UCAgent MCP端口号保持一致）：
 
-```json
+```bash
+# 将命令中的 PORT_NUMBER 占位符替换为实际端口号，且与 UCAgent 启动时选择的 MCP 端口号保持一致（若端口随机，则该命令中端口也应使用相同随机端口）
+claude mcp add --transport http unitytest http://127.0.0.1:PORT_NUMBER/mcp --scope project
+```
+
+如果您是手动启动 MCP，例如：
+
+```bash
+make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000 CONTINUE=1
+```
+
+则启动完成后，需要手动执行：
+
+```bash
+claude mcp add --transport http unitytest http://127.0.0.1:5000/mcp --scope project
+```
+
+如果 `PORT_NUMBER` 没有手动指定、而是由 Makefile 随机分配，则这里的 `claude mcp add` 也必须使用同一个随机端口。
+您可以从 `result/<PORT>/run_log.txt` 路径中的目录名，或 `make run` / `make run_seq_mcp` 的终端输出中确认实际使用的端口号。
+
+Claude Code的Hooks配置（~/.claude/settings.json）建议如下：
+下面示例使用的是 `jsonc`（可带注释的 JSON）格式，便于解释配置项含义：
+
+```jsonc
 {
-  ...
-  "mcpServers": {
-    "unitytest": {
-      "httpUrl": "http://127.0.0.1:5000/mcp",
-      "timeout": 100000     # 调到100s，很多case运行时间比较长，防止超时
-    }
-  },
-  "allowMCPServers": [
-    "unitytest"
-  ],
   "hooks": {
-  "Stop": [{"hooks": [{
-"type": "command",
-"command": "tmux send-keys `ucagent --hook-message 'continue|quit'`; sleep 1; tmux send-keys Enter",
-"timeout": 3
+    // matcher 为空字符串表示对所有 Stop 事件生效
+    "Stop": [{"matcher": "", "hooks": [{
+      "type": "command",
+      "command": "tmux send-keys `ucagent --hook-message 'continue|quit'`; sleep 1; tmux send-keys Enter",
+      "timeout": 3
     }]}]
   }
 }
 ```
 
-上述Hooks用于让iFlow在Tmux中可以自动继续执行而不需要人工干预。
+上述Hooks用于让Claude Code在Tmux中可以自动继续执行而不需要人工干预。
 
 ### 开始运行
 
@@ -105,7 +118,9 @@ cd hackathon2512
 # 编译DUT (Design Under Test) 该步骤可选
 make build_dut_cache
 
-# 自动顺序验证，基于Tmux（需要提前完成iFlow登录认证）
+# 自动顺序验证，基于Tmux（需要提前完成Claude Code登录认证）
+# `make run` 内部会以 `claude --dangerously-skip-permissions` 启动 Claude Code，
+# 用于跳过 tmux 自动化场景下的交互式授权确认；请仅在您信任当前工作目录和命令流程时使用。
 #   VTARGET 参数：用于指定待验证的RTL文件（多文件用`;`隔开，支持通配符）
 #   TIMES 参数：用于指定UCAgent的验证次数（重复验证的次数）
 #   UCARGS 参数：传递自定义参数到UCAgent
@@ -122,9 +137,10 @@ TEMPLATE_MUST_FAIL=false make run VTARGET=origin_file/*.v
 make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000
 
 # 继续上次UCAgent， 不加 CONTINUE=1 会清空工作目录重新运行
-# 如果需要通过 tmux 正常退出 iflow，请指定 IFLOW_VERSION=0.3.24 （跟高版本有退出bug）
-# iFlow更新很快，latest可能不稳定，需要自行选择合适版本，例如 0.3.30
-make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000 CONTINUE=1 IFLOW_VERSION=0.3.24
+make run_seq_mcp VTARGET=bug_file/VectorIdiv_bug_1.v PORT=5000 CONTINUE=1
+
+# 手动启动 MCP 后，需要用同一个端口配置 Claude Code
+claude mcp add --transport http unitytest http://127.0.0.1:5000/mcp --scope project
 
 # 清空临时数据
 make clean
@@ -135,8 +151,10 @@ make clean_all
 
 结果位于`result/<port>/`目录下, port为每次启动时随机选择的MCP端口。
 PORT 可以通过参数指定 eg: `make run PORT=5005`。
+执行 `make run` 时，会自动执行 `claude mcp add --transport http unitytest http://127.0.0.1:<PORT>/mcp --scope project`，
+其中 `<PORT>` 与 UCAgent MCP 端口保持一致；如果是随机端口，则 Claude Code 也会自动使用同一个随机端口。
 
-请根据您的需要修改`Makefile`，例如支持 Claude Code 等。
+如需接入其他 Code Agent，可再根据您的需要修改 `Makefile`。
 
 ### 成果提交
 
@@ -207,8 +225,8 @@ echo "" > dutcache/VectorIdiv_origin/VectorIdiv/VectorIdiv.v
 ###### （2）收集正常DUT的测试用例
 
 ```bash
-# 提前完成iFlow认证，选好模型 GLM 4.6
-npx -y @iflow-ai/iflow-cli@latest
+# 提前完成Claude Code认证，选好模型
+claude
 
 # 关闭测试用例模板强制Fail检查来进行UT验证
 TEMPLATE_MUST_FAIL=false make run VTARGET=origin_file/VectorIdiv_origin.v
@@ -318,7 +336,7 @@ test_VectorIdiv_boundary_handling.py:21: AssertionError
 - 我可以先通过MCP的方式把Bug都跑出来，然后把Bug描述给LLM去用API模式跑效率赛道，这样时间代价更小。
 - 既然例子中提供了Batch执行模式，我可以让LLM晚上连续工作，我白天分析其结果。
 - LLM存在随机性，每次跑出的结果都不一样，因此可以多跑，充分发挥“随机性”在验证工作中的作用。
-- 为何用iFLow作为例子呢？因为它API免费，国内开源大模型几乎都有：GLM 4.6, Qwen3-coder, MinMax M2，Kimi-k2 thinking 等。
+- 为何用 Claude Code 作为例子呢？因为它支持 MCP HTTP 模式，能够直接复用 UCAgent 的 MCP 端口，便于把验证流程接到同一个自动化工作流中。
 - 使用更强的模型，对于一些商业模型，训练数据中就包含了 RSIC-V 的 Specification，不给完整spec也能发现bug。
 - DUT的功能明确，接口简单，如果此时Verilog文件太长或者复杂(例如混淆)，则可清空对应RTL内容避免给LLM上下文带来负担。
 - 听说学生党可以申请 Copilot 教育计划，白嫖 Claude 4.5, GPT-5.1-Codex 等前沿模型（王炸组合：UCAgent-MCP + Copilot CLI + Claude 4.5）

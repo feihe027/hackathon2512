@@ -111,6 +111,10 @@ run_seq_cagent:
 	  $(MAKE) run_one_cagent PORT=$(PORT); \
 	done
 
+config_claude_mcp:
+	@echo "Configure Claude MCP server unitytest at http://127.0.0.1:$(PORT)/mcp"
+	cd $(WORKSPACE)/$(PORT) && claude mcp add --transport http unitytest http://127.0.0.1:$(PORT)/mcp --scope project
+
 run_one_cagent:
 	@while [ ! -e "$(WORKSPACE)/$(PORT)/Guide_Doc/dut_fixture.md" ] || \
 	       [ -e "$(WORKSPACE)/$(PORT)/dut_complete.txt" ]; do \
@@ -119,14 +123,13 @@ run_one_cagent:
 	    exit 0; \
 	  fi; \
 	done
-	# Run iFlow CLI
+	# Run Claude Code
 	#  You can modify the corresponding startup code according to different Code Agent
-	mkdir -p $(WORKSPACE)/$(PORT)/.iflow
-	cp ~/.iflow/settings.json $(WORKSPACE)/$(PORT)/.iflow/settings.json
-	sed -i "s/$(OLDPORT)\/mcp/$(PORT)\/mcp/" $(WORKSPACE)/$(PORT)/.iflow/settings.json
+	$(MAKE) config_claude_mcp PORT=$(PORT) WORKSPACE=$(WORKSPACE)
 	(sleep 10; tmux send-keys `ucagent --hook-message cagent_init`; sleep 1; tmux send-keys Enter)&
-	cd $(WORKSPACE)/$(PORT) && npx -y @iflow-ai/iflow-cli@$(IFLOW_VERSION) -y && (echo true > dut_complete.txt)
-	@echo "`date`: DUT iflow execution completed." >> $(RESULT)/$(PORT)/run_log.txt
+	# Skip interactive permission prompts so Claude can run inside tmux automation; Claude MCP is already configured above with the same PORT.
+	cd $(WORKSPACE)/$(PORT) && claude --dangerously-skip-permissions && (echo true > dut_complete.txt)
+	@echo "`date`: DUT claude code execution completed." >> $(RESULT)/$(PORT)/run_log.txt
 
 run:
 	tmux kill-session -t hk_batch_cagent_session_$(PORT) || true
